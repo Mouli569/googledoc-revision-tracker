@@ -97,8 +97,7 @@ def diff() -> None:
         print("No differences found between the two files.")
         return
 
-    diff_filename_base = f"diff_{old_file.stem}_vs_{new_file.stem}"
-    diff_path = export_file_content(diff_content, diff_filename_base)
+    diff_path = export_file_content("diffs", diff_content, "diff")
 
     print(f"Differences saved to {diff_path}")
 

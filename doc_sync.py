@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import os
 import re
 import sys
@@ -383,3 +384,29 @@ def fetch_document_title(service: DriveService, file_id: str) -> str:
 
     response = service.files().get(fileId=file_id, fields="name").execute()
     return str(response.get("name", "Untitled Document"))
+
+
+def get_recent_exports(limit: int = 2) -> List[Path]:
+    """Retrieve the most recent export files."""
+    if not EXPORT_DIR.exists():
+        return []
+    
+    files = list(EXPORT_DIR.glob("*.txt"))
+    # Sort by modification time, newest first
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return files[:limit]
+
+
+def create_diff(old_path: Path, new_path: Path) -> str:
+    """Generate a unified diff between two files."""
+    old_lines = old_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    new_lines = new_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    
+    diff = difflib.unified_diff(
+        old_lines,
+        new_lines,
+        fromfile=old_path.name,
+        tofile=new_path.name,
+        lineterm=""
+    )
+    return "".join(diff)

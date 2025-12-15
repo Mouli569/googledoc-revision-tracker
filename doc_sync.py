@@ -8,12 +8,11 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Protocol, TypedDict, cast, runtime_checkable
+from typing import Dict, List, Protocol, cast, runtime_checkable
 
 from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-EXPORT_DIR = Path("exports")
 @runtime_checkable
 class DriveListRequest(Protocol):
     def execute(self) -> Dict[str, object]: ...
@@ -62,282 +61,39 @@ class FlowResult:
 def get_time(format: str = '%Y-%m-%d-%H%M%S') -> str:
     return datetime.now(timezone.utc).strftime(format)
 
-
 def get_required_env(var_name: str) -> str:
-
-
-
-
-
     """Retrieve required environment variable or exit with helpful message."""
-
-
-
-
-
-
-
-
-
-
-
     value = os.environ.get(var_name)
-
-
-
-
-
     if value:
-
-
-
-
-
         return value
-
-
-
-
-
-
-
-
-
-
-
     print(
-
-
-
-
-
         f"Error: Missing required environment variable: {var_name}\n"
-
-
-
-
-
         f"Please set it before running the CLI, e.g.\n"
-
-
-
-
-
         f"  export {var_name}='example-value'",
-
-
-
-
-
         file=sys.stderr,
-
-
-
-
-
     )
-
-
-
-
-
     raise SystemExit(1)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def sanitize_filename(title: str, max_length: int = 200) -> str:
-
-
-
-
-
     """Convert a document title into a filesystem-safe filename segment."""
-
-
-
-
-
-
-
-
-
-
-
     safe_title = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", "_", title)
-
-
-
-
-
     safe_title = re.sub(r"[^\w.\-]+", "_", safe_title)
-
-
-
-
-
     safe_title = re.sub(r"[_\s]+", "_", safe_title).strip("_")
-
-
-
-
-
     if not safe_title:
-
-
-
-
-
         safe_title = "untitled"
-
-
-
-
-
     allowed_length = max_length - 21
-
-
-
-
-
     if len(safe_title) > allowed_length:
-
-
-
-
-
         safe_title = safe_title[:allowed_length]
-
-
-
-
-
     return safe_title
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def ensure_export_dir() -> None:
-
-
-
-
-
-    """Ensure the exports directory exists."""
-
-
-
-
-
-
-
-
-
-
-
-    EXPORT_DIR.mkdir(exist_ok=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def export_file_content(content: str, filename_base: str) -> Path:
-
-
-
-
-
+def export_file_content(export_dir: str, content: str, filename_base: str) -> Path:
     """Write content to a file in the exports directory."""
-
-
-
-
-
-
-
-
-
-
-
-    ensure_export_dir()
-
-
-
-
-
     filename = f"{get_time()}_{sanitize_filename(filename_base)}.txt"
-
-
-
-
-
+    EXPORT_DIR = Path(export_dir)
+    EXPORT_DIR.mkdir(exist_ok=True, parents=True)
     export_path = EXPORT_DIR / filename
-
-
-
-
-
     export_path.write_text(content, encoding="utf-8")
-
-
-
-
-
     return export_path
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def run_flow_with_timeout(flow: InstalledAppFlowProtocol, timeout: int = 120) -> object:
     """Run the OAuth flow with a timeout to avoid hanging browser sessions."""
@@ -386,11 +142,13 @@ def fetch_document_title(service: DriveService, file_id: str) -> str:
     return str(response.get("name", "Untitled Document"))
 
 
-def get_recent_exports(limit: int = 2) -> List[Path]:
+def get_recent_exports(limit: int = 2, folder: str="exports") -> List[Path]:
     """Retrieve the most recent export files."""
+
+    EXPORT_DIR = Path(folder)
     if not EXPORT_DIR.exists():
         return []
-    
+
     files = list(EXPORT_DIR.glob("*.txt"))
     # Sort by modification time, newest first
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
@@ -401,12 +159,13 @@ def create_diff(old_path: Path, new_path: Path) -> str:
     """Generate a unified diff between two files."""
     old_lines = old_path.read_text(encoding="utf-8").splitlines(keepends=True)
     new_lines = new_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    
+
     diff = difflib.unified_diff(
         old_lines,
         new_lines,
         fromfile=old_path.name,
         tofile=new_path.name,
-        lineterm=""
+        lineterm="",
+        n=0
     )
     return "".join(diff)

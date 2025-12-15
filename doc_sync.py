@@ -302,7 +302,7 @@ def export_file_content(content: str, filename_base: str) -> Path:
 
 
 
-    filename = f"{datetime.now(timezone.utc).date()}_{sanitize_filename(filename_base)}.txt"
+    filename = f"{datetime.now(timezone.utc).strftime('%Y-%m-%d-%H%M%S')}_{sanitize_filename(filename_base)}.txt"
 
 
 

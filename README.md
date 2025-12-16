@@ -10,7 +10,7 @@ A Python CLI tool to download and track Google Docs revision history.
 - **Custom Folder Names**: Organize revisions with readable folder names
 - **Automatic Retry with Backoff**: Handles rate limiting with exponential backoff (up to 5 retries)
 - **OAuth Authentication**: Secure authentication with automatic token refresh
-- **Flexible Input**: Specify documents via CLI arguments, config file, or environment variable
+- **Flexible Input**: Specify documents via CLI arguments, or config file
 - **Simple CLI**: Clean command interface with progress tracking
 
 ## Prerequisites

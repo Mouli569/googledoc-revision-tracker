@@ -406,7 +406,7 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str, creden
     1. Creates a subdirectory named after the file_id
     2. Fetches all available revisions via API
     3. Downloads each revision's plain text export
-    4. Saves with filename: {revision_id}_{author}_{timestamp}.txt
+    4. Saves with filename: {timestamp}.txt
 
     Args:
         service_v2: Drive API v2 service object (required for revisions).
@@ -449,9 +449,6 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str, creden
         revision_id = revision['id']
         modified_date = revision['modifiedDate']
 
-        # Extract author email (or use 'unknown' if not available)
-        modifier = revision.get('lastModifyingUser', {}).get('emailAddress', 'unknown')
-
         # Get the plain text export link
         export_links = revision.get('exportLinks', {})
         if 'text/plain' not in export_links:
@@ -459,10 +456,9 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str, creden
 
         export_link = export_links['text/plain']
 
-        # Create descriptive filename with revision metadata
-        safe_modifier = sanitize_filename(modifier.split('@')[0])  # Username only
+        # Create filename from timestamp only
         safe_date = modified_date.replace(':', '-').replace('.', '-')
-        filename = f"{revision_id}_{safe_modifier}_{safe_date}.txt"
+        filename = f"{safe_date}.txt"
         file_path = output_dir / filename
 
         # Download the revision content with OAuth authentication

@@ -6,7 +6,8 @@ A Python CLI tool to download and track Google Docs revision history.
 
 - **Multiple Document Support**: Track revision history for multiple Google Docs simultaneously
 - **Revision History Download**: Download all historical revisions as individual timestamped files
-- **ID-Based Organization**: Revisions organized by document ID (stable and unique identifiers)
+- **Granular Time Filtering**: Get final revision per hour, day, week, or month instead of all revisions
+- **Custom Folder Names**: Organize revisions with readable folder names
 - **Automatic Retry with Backoff**: Handles rate limiting with exponential backoff (up to 5 retries)
 - **OAuth Authentication**: Secure authentication with automatic token refresh
 - **Flexible Input**: Specify documents via CLI arguments, config file, or environment variable
@@ -47,20 +48,28 @@ cp documents.yaml.example documents.yaml
 # Edit documents.yaml and add your document IDs
 ```
 
-Example `documents.yaml` with custom folder names:
+Example `documents.yaml` with custom folder names and granularity:
 ```yaml
 documents:
   - id: 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
     name: cv-matt
+    granularity: daily  # Final revision per day
   - id: 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
     name: project-proposal
+    granularity: weekly  # Final revision per week
 ```
 
-Or simple format (uses document ID as folder name):
+**Granularity Options:**
+- `all` - Download all revisions (default)
+- `hourly` - Final revision per hour
+- `daily` - Final revision per day (recommended for active documents)
+- `weekly` - Final revision per week (recommended for less active documents)
+- `monthly` - Final revision per month (recommended for archived documents)
+
+Simple format (uses document ID, downloads all revisions):
 ```yaml
 documents:
   - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
-  - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
 ```
 
 **Option 2: Environment Variable (Single document)**
@@ -177,14 +186,20 @@ google-sync-simple/
 2. **Authenticate**: Uses Google OAuth 2.0 (opens browser on first run)
 3. **For Each Document**:
    - Fetches document title via Drive API v3 (for display)
-   - Creates folder using document ID
+   - Creates folder using custom name or document ID
    - Uses Drive API v2 to list all document revisions (v3 doesn't support this)
-4. **Download Revisions**: For each revision:
+   - Filters revisions by granularity (if not 'all')
+4. **Download Revisions**: For each filtered revision:
    - Gets the plain text export link from the API
    - Downloads with OAuth bearer token authentication
    - Automatically retries with exponential backoff on rate limiting (429 errors)
    - Saves with ISO 8601 timestamp as filename
-5. **Save**: All revisions stored in `revisions/{DOCUMENT_ID}/`
+5. **Save**: Filtered revisions stored in `revisions/{folder_name}/`
+
+**Example with daily granularity:**
+```
+9 total revisions → 4 daily snapshots (final revision per day)
+```
 
 ## Troubleshooting
 

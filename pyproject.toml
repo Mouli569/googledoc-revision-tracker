@@ -1,7 +1,7 @@
 [project]
 name = "google-sync-simple"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Python CLI tool to download and track Google Docs content and revision history"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import difflib
 import os
 import re
 import sys
@@ -10,9 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Protocol, cast, runtime_checkable
 
+import yaml
 from googleapiclient.discovery import build
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+GOOGLE_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+
 @runtime_checkable
 class DriveListRequest(Protocol):
     def execute(self) -> Dict[str, object]: ...
@@ -108,6 +109,45 @@ def get_required_env(var_name: str) -> str:
     )
     raise SystemExit(1)
 
+def load_document_ids_from_config(config_path: str = "documents.yaml") -> List[str]:
+    """
+    Load document IDs from YAML configuration file.
+
+    This function reads a YAML file containing a list of Google Doc IDs to track.
+    If the file doesn't exist or is malformed, returns an empty list.
+
+    Args:
+        config_path: Path to YAML configuration file (default: "documents.yaml").
+
+    Returns:
+        List of document IDs from the config file, empty list if file doesn't exist
+        or doesn't contain a 'documents' key.
+
+    Example:
+        >>> # documents.yaml content:
+        >>> # documents:
+        >>> #   - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+        >>> #   - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
+        >>> ids = load_document_ids_from_config()
+        >>> print(ids)
+        ['1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8', '2A-bNkPst...']
+    """
+    path = Path(config_path)
+    if not path.exists():
+        return []
+
+    try:
+        with path.open() as f:
+            config = yaml.safe_load(f)
+
+        if not config or 'documents' not in config:
+            return []
+
+        return config['documents']
+    except Exception:
+        # If YAML is malformed or any other error, return empty list
+        return []
+
 def sanitize_filename(title: str, max_length: int = 200) -> str:
     """
     Convert a document title into a safe filename by removing/replacing problematic characters.
@@ -152,35 +192,40 @@ def sanitize_filename(title: str, max_length: int = 200) -> str:
 
     return safe_title
 
-def export_file_content(export_dir: str, content: str, filename_base: str) -> Path:
+def get_unique_folder_name(base_dir: str, doc_title: str, doc_id: str) -> str:
     """
-    Write content to a timestamped text file in the specified export directory.
+    Generate unique folder name for document revisions.
 
-    This function:
-    1. Creates a filename with current timestamp and sanitized base name
-    2. Creates the export directory if it doesn't exist
-    3. Writes the content to the file
-    4. Returns the path to the created file
+    If a folder with the sanitized title already exists, appends the last 6 characters
+    of the document ID to ensure uniqueness. This handles the case where multiple
+    documents have identical titles.
 
     Args:
-        export_dir: Directory to save the file in (e.g., 'exports', 'diffs').
-        content: Text content to write to the file.
-        filename_base: Base name for the file (will be sanitized and timestamped).
+        base_dir: Base directory where revision folders are stored (e.g., "revisions").
+        doc_title: Document title from Google Drive.
+        doc_id: Google Drive document ID.
 
     Returns:
-        Path object pointing to the created file.
+        Unique folder name (not a full path, just the folder name).
 
     Example:
-        >>> path = export_file_content("exports", "Document text", "My Doc")
-        >>> print(path)
-        exports/2025-12-15-143000_My_Doc.txt
+        >>> # First document named "Meeting Notes"
+        >>> get_unique_folder_name("revisions", "Meeting Notes", "abc123xyz")
+        'Meeting_Notes'
+        >>> # Second document with same title (folder already exists)
+        >>> get_unique_folder_name("revisions", "Meeting Notes", "def456uvw")
+        'Meeting_Notes_456uvw'
     """
-    filename = f"{get_time()}_{sanitize_filename(filename_base)}.txt"
-    EXPORT_DIR = Path(export_dir)
-    EXPORT_DIR.mkdir(exist_ok=True, parents=True)
-    export_path = EXPORT_DIR / filename
-    export_path.write_text(content, encoding="utf-8")
-    return export_path
+    base_path = Path(base_dir)
+    safe_title = sanitize_filename(doc_title)
+    folder_path = base_path / safe_title
+
+    if not folder_path.exists():
+        return safe_title
+
+    # Folder exists - append last 6 chars of document ID
+    id_suffix = doc_id[-6:]
+    return f"{safe_title}_{id_suffix}"
 
 def run_flow_with_timeout(flow: InstalledAppFlowProtocol, timeout: int = 120) -> object:
     """
@@ -323,79 +368,13 @@ def fetch_document_title(service: DriveService, file_id: str) -> str:
     return str(response.get("name", "Untitled Document"))
 
 
-def get_recent_exports(limit: int = 2, folder: str="exports") -> List[Path]:
-    """
-    Retrieve the most recent export files from a directory.
-
-    Finds all .txt files in the specified folder and returns the most recently
-    modified files. Useful for finding recent exports to compare with diff.
-
-    Args:
-        limit: Maximum number of files to return (default: 2).
-        folder: Directory to search for exports (default: "exports").
-
-    Returns:
-        List of Path objects, sorted by modification time (newest first).
-        Returns empty list if folder doesn't exist or contains no .txt files.
-
-    Example:
-        >>> recent = get_recent_exports(2, "exports")
-        >>> if len(recent) >= 2:
-        ...     new_file, old_file = recent
-        ...     print(f"Comparing {old_file} to {new_file}")
-    """
-    EXPORT_DIR = Path(folder)
-    if not EXPORT_DIR.exists():
-        return []
-
-    files = list(EXPORT_DIR.glob("*.txt"))
-    # Sort by modification time, newest first
-    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return files[:limit]
-
-
-def create_diff(old_path: Path, new_path: Path) -> str:
-    """
-    Generate a unified diff between two text files.
-
-    Creates a diff showing changes between two files, similar to git diff.
-    Uses unified diff format with minimal context (0 surrounding lines).
-
-    Args:
-        old_path: Path to the older file (baseline).
-        new_path: Path to the newer file (comparison).
-
-    Returns:
-        Unified diff string showing additions (+) and deletions (-).
-        Returns empty string if files are identical.
-
-    Example:
-        >>> diff_content = create_diff(
-        ...     Path("exports/old.txt"),
-        ...     Path("exports/new.txt")
-        ... )
-        >>> if diff_content:
-        ...     print("Files differ:")
-        ...     print(diff_content)
-        ... else:
-        ...     print("Files are identical")
-    """
-    old_lines = old_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    new_lines = new_path.read_text(encoding="utf-8").splitlines(keepends=True)
-
-    # Generate unified diff with minimal context (n=0)
-    diff = difflib.unified_diff(
-        old_lines,
-        new_lines,
-        fromfile=old_path.name,
-        tofile=new_path.name,
-        lineterm="",
-        n=0
-    )
-    return "".join(diff)
-
-
-def download_revisions(service_v2: object, file_id: str, export_dir: str, credentials: object = None) -> List[Path]:
+def download_revisions(
+    service_v2: object,
+    file_id: str,
+    export_dir: str,
+    credentials: object = None,
+    doc_title: str | None = None,
+) -> List[Path]:
     """
     Download all revisions of a Google Doc as individual text files.
 
@@ -403,7 +382,7 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str, creden
     Each revision is saved as a separate file with metadata in the filename.
 
     The function:
-    1. Creates a subdirectory named after the file_id
+    1. Creates a subdirectory named after the document title (or file_id if title not provided)
     2. Fetches all available revisions via API
     3. Downloads each revision's plain text export
     4. Saves with filename: {timestamp}.txt
@@ -413,6 +392,8 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str, creden
         file_id: Google Drive document ID.
         export_dir: Base directory for saving revisions (e.g., "revisions").
         credentials: OAuth2 credentials for authenticated downloads (optional).
+        doc_title: Document title for folder naming. If provided, uses sanitized title
+                   as folder name. If None, falls back to file_id (optional).
 
     Returns:
         List of Path objects for all downloaded revision files.
@@ -425,15 +406,21 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str, creden
 
     Example:
         >>> service_v2 = build_drive_service_v2(credentials)
-        >>> files = download_revisions(service_v2, "doc_id", "revisions")
+        >>> files = download_revisions(service_v2, "doc_id", "revisions", doc_title="My Document")
         >>> print(f"Downloaded {len(files)} revisions")
         >>> for f in files:
         ...     print(f"  - {f.name}")
     """
     import urllib.request
 
+    # Create folder name - use title if provided, otherwise use file_id
+    if doc_title:
+        folder_name = get_unique_folder_name(export_dir, doc_title, file_id)
+    else:
+        folder_name = file_id
+
     # Create output directory for this document's revisions
-    output_dir = Path(export_dir) / file_id
+    output_dir = Path(export_dir) / folder_name
     output_dir.mkdir(exist_ok=True, parents=True)
 
     # Fetch all revisions from Drive API v2

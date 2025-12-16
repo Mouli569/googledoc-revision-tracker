@@ -208,5 +208,7 @@ __marimo__/
 
 # Project specific files
 .env
+.envrc
 client_secret.json
 token.json
+documents.yaml

@@ -1,0 +1,14 @@
+# Configuration file for tracking multiple Google Docs
+#
+# List the Google Doc IDs you want to track here.
+# To find a document ID, look at the document URL:
+# https://docs.google.com/document/d/YOUR_DOC_ID_HERE/edit
+#
+# Copy this file to 'documents.yaml' and add your document IDs:
+#   cp documents.yaml.example documents.yaml
+
+documents:
+  # Example document IDs (replace with your actual document IDs):
+  # - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+  # - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
+  # - 3C-dPlQstuvwxFGh56klMNOPQRabcd7efgh0ijklmnop

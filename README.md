@@ -1,12 +1,15 @@
-# Google Docs Sync
+# Google Docs Revision Tracker
 
-A Python CLI tool to download and track Google Docs content and revision history.
+A Python CLI tool to download and track Google Docs revision history.
 
 ## Features
 
-- **Revision History Download**: Download all historical revisions of a Google Doc as individual timestamped files
+- **Multiple Document Support**: Track revision history for multiple Google Docs simultaneously
+- **Revision History Download**: Download all historical revisions as individual timestamped files
+- **Title-Based Organization**: Revisions organized by document title for easy navigation
 - **OAuth Authentication**: Secure authentication with automatic token refresh
-- **Simple CLI**: Single command interface - just run and download
+- **Flexible Input**: Specify documents via CLI arguments, config file, or environment variable
+- **Simple CLI**: Clean command interface with progress tracking
 
 ## Prerequisites
 
@@ -30,7 +33,27 @@ A Python CLI tool to download and track Google Docs content and revision history
 3. Choose "Desktop app" as the application type
 4. Download the JSON file and save it (e.g., `client_secrets.json`)
 
-### 3. Configure Environment Variables
+### 3. Configure Documents to Track
+
+You have three options for specifying which documents to track:
+
+**Option 1: YAML Configuration File (Recommended for multiple documents)**
+
+Create a `documents.yaml` file:
+
+```bash
+cp documents.yaml.example documents.yaml
+# Edit documents.yaml and add your document IDs
+```
+
+Example `documents.yaml`:
+```yaml
+documents:
+  - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+  - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
+```
+
+**Option 2: Environment Variable (Single document)**
 
 Create a `.env` file in the project root:
 
@@ -38,10 +61,13 @@ Create a `.env` file in the project root:
 # Path to your OAuth client secrets JSON file
 GOOGLE_OAUTH_CLIENT_SECRETS=path/to/client_secrets.json
 
-# Your Google Doc ID (from the document URL)
-# https://docs.google.com/document/d/YOUR_DOC_ID_HERE/edit
+# Single document ID
 GOOGLE_DOCUMENT_ID=your_document_id_here
 ```
+
+**Option 3: CLI Arguments (Ad-hoc usage)**
+
+Pass document IDs directly when running the command (see Usage below).
 
 ### 4. Install Dependencies
 
@@ -57,32 +83,54 @@ uv sync
 
 ## Usage
 
-Download all revisions of your Google Doc:
+### Basic Usage
 
+**Using config file (documents.yaml):**
 ```bash
 python main.py
 ```
 
-Or with a custom OAuth timeout:
+**Using environment variable (single document):**
+```bash
+export GOOGLE_DOCUMENT_ID=your_document_id
+python main.py
+```
 
+**Using CLI arguments (one or more documents):**
+```bash
+# Single document
+python main.py 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+
+# Multiple documents
+python main.py DOC_ID_1 DOC_ID_2 DOC_ID_3
+```
+
+**With custom OAuth timeout:**
 ```bash
 python main.py --timeout 300  # 5 minutes
 ```
 
 ### Output
 
-Revisions are saved to: `revisions/DOCUMENT_ID/{timestamp}.txt`
+Revisions are saved to: `revisions/{Document_Title}/{timestamp}.txt`
 
-Example filenames:
+Example folder structure:
 ```
-revisions/1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8/
-├── 2025-07-30T07-18-16-081Z.txt
-├── 2025-07-30T07-35-51-386Z.txt
-├── 2025-10-09T16-34-01-365Z.txt
-└── 2025-12-15T19-31-43-713Z.txt
+revisions/
+├── CV-Matt/
+│   ├── 2025-07-30T07-18-16-081Z.txt
+│   ├── 2025-07-30T07-35-51-386Z.txt
+│   └── 2025-12-15T19-31-43-713Z.txt
+├── Project_Proposal/
+│   ├── 2025-08-15T10-22-33-123Z.txt
+│   └── 2025-09-20T14-56-12-456Z.txt
+└── Meeting_Notes/
+    └── 2025-11-01T09-15-30-500Z.txt
 ```
 
-Each filename is the exact modification timestamp from Google Drive.
+- Folders are named using sanitized document titles
+- If multiple documents have the same title, the last 6 characters of the document ID are appended
+- Each filename is the exact modification timestamp from Google Drive
 
 ## Authentication
 
@@ -101,24 +149,29 @@ python main.py --timeout 300  # 5 minutes
 
 ```
 google-sync-simple/
-├── main.py          # CLI interface and OAuth flow
-├── doc_sync.py      # Core Google Drive API functionality
-├── .env             # Environment variables (not committed)
-├── .env.example     # Example environment configuration
-├── token.json       # OAuth credentials (generated, not committed)
-└── revisions/       # Downloaded revision history
-    └── DOCUMENT_ID/ # One folder per document
+├── main.py                 # CLI interface and OAuth flow
+├── drive_revisions.py      # Core Google Drive API functionality
+├── documents.yaml          # Document IDs to track (not committed)
+├── documents.yaml.example  # Example document configuration
+├── .env                    # Environment variables (not committed)
+├── token.json              # OAuth credentials (generated, not committed)
+└── revisions/              # Downloaded revision history
+    └── {Document_Title}/   # One folder per document (named by title)
 ```
 
 ## How It Works
 
-1. **Authenticate**: Uses Google OAuth 2.0 (opens browser on first run)
-2. **Fetch Revisions**: Uses Drive API v2 to list all document revisions (v3 doesn't support this)
-3. **Download**: For each revision:
+1. **Resolve Document IDs**: Checks CLI arguments, config file, or environment variable
+2. **Authenticate**: Uses Google OAuth 2.0 (opens browser on first run)
+3. **For Each Document**:
+   - Fetches document title via Drive API v3
+   - Creates sanitized folder name from title
+   - Uses Drive API v2 to list all document revisions (v3 doesn't support this)
+4. **Download Revisions**: For each revision:
    - Gets the plain text export link from the API
    - Downloads with OAuth bearer token authentication
    - Saves with ISO 8601 timestamp as filename
-4. **Save**: All revisions stored in `revisions/DOCUMENT_ID/`
+5. **Save**: All revisions stored in `revisions/{Document_Title}/`
 
 ## Troubleshooting
 
@@ -160,8 +213,9 @@ Google API rate limits may be hit when downloading many revisions. The tool will
 
 ### Code Structure
 
-- `doc_sync.py`: Pure functions for Google Drive operations
+- `drive_revisions.py`: Core functions for Google Drive operations and revision downloads
 - `main.py`: Typer CLI interface and OAuth flow management
+- `documents.yaml`: Configuration file for tracking multiple documents
 
 ## License
 

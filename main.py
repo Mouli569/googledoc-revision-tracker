@@ -11,13 +11,9 @@ from doc_sync import (
     SCOPES,
     build_drive_service,
     build_drive_service_v2,
-    create_diff,
     download_revisions,
-    export_file_content,
     fetch_document_title,
-    get_recent_exports,
     get_required_env,
-    get_time,
     run_flow_with_timeout,
 )
 
@@ -75,65 +71,7 @@ def get_credentials(timeout: int = 120) -> Credentials:
 
 
 @app.command()
-def export(
-    timeout: int = typer.Option(
-        120, help="Seconds to wait for OAuth browser authorization"
-    ),
-) -> None:
-    """
-    Export the current content of a Google Doc to a text file.
-    """
-    document_id = get_required_env("GOOGLE_DOCUMENT_ID")
-    credentials = get_credentials(timeout)
-    service = build_drive_service(credentials)
-    doc_title = fetch_document_title(service, document_id)
-    response = (
-        service.files()
-        .export(
-            fileId=document_id,
-            mimeType="text/plain",
-        )
-        .execute()
-    )
-
-    if isinstance(response, bytes):
-        content = response.decode("utf-8")
-    else:
-        content = str(response)
-
-    export_path = export_file_content("exports", content, doc_title)
-
-    print(f"Exported current content of '{doc_title}' to {export_path}")
-
-
-@app.command()
-def diff() -> None:
-    """
-    Compare the two most recent exports and save the diff.
-    """
-    print("Finding the two most recent exports...")
-    recent_files = get_recent_exports(2)
-
-    if len(recent_files) < 2:
-        print("Error: Not enough export files to compare. Run the export command at least twice.")
-        raise typer.Exit(code=1)
-
-    new_file, old_file = recent_files
-    print(f"Comparing '{old_file.name}' (old) and '{new_file.name}' (new)...")
-
-    diff_content = create_diff(old_file, new_file)
-
-    if not diff_content:
-        print("No differences found between the two files.")
-        return
-
-    diff_path = export_file_content("diffs", diff_content, "diff")
-
-    print(f"Differences saved to {diff_path}")
-
-
-@app.command()
-def revisions(
+def download(
     timeout: int = typer.Option(
         120, help="Seconds to wait for OAuth browser authorization"
     ),

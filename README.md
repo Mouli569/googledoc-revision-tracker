@@ -4,9 +4,9 @@ A Python CLI tool to download and track Google Docs content and revision history
 
 ## Features
 
-- **Export Current Content**: Download the current state of a Google Doc as plain text
-- **Revision History**: Download all historical revisions of a document with timestamps and author information
-- **Diff Comparison**: Compare the two most recent exports and generate a unified diff
+- **Revision History Download**: Download all historical revisions of a Google Doc as individual timestamped files
+- **OAuth Authentication**: Secure authentication with automatic token refresh
+- **Simple CLI**: Single command interface - just run and download
 
 ## Prerequisites
 
@@ -57,40 +57,32 @@ uv sync
 
 ## Usage
 
-### Export Current Content
-
-Download the current state of your Google Doc:
+Download all revisions of your Google Doc:
 
 ```bash
-python main.py export
+python main.py
 ```
 
-Output: `exports/YYYY-MM-DD-HHMMSS_Document_Title.txt`
-
-### Download Revision History
-
-Download all historical revisions of the document:
+Or with a custom OAuth timeout:
 
 ```bash
-python main.py revisions
+python main.py --timeout 300  # 5 minutes
 ```
 
-Output: `revisions/DOCUMENT_ID/REVISION_ID_author_timestamp.txt`
+### Output
 
-Each revision file includes:
-- Revision ID
-- Author email (username part only)
-- Modification timestamp
+Revisions are saved to: `revisions/DOCUMENT_ID/{timestamp}.txt`
 
-### Compare Recent Exports
-
-Generate a diff between the two most recent exports:
-
-```bash
-python main.py diff
+Example filenames:
+```
+revisions/1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8/
+├── 2025-07-30T07-18-16-081Z.txt
+├── 2025-07-30T07-35-51-386Z.txt
+├── 2025-10-09T16-34-01-365Z.txt
+└── 2025-12-15T19-31-43-713Z.txt
 ```
 
-Output: `diffs/YYYY-MM-DD-HHMMSS_diff.txt`
+Each filename is the exact modification timestamp from Google Drive.
 
 ## Authentication
 
@@ -99,50 +91,34 @@ On first run, the tool will:
 2. Ask you to grant access to Google Drive
 3. Save credentials to `token.json` for future use
 
-The OAuth flow has a 2-minute timeout. If you need more time, use:
+The OAuth flow has a 2-minute timeout by default. If you need more time:
 
 ```bash
-python main.py export --timeout 300  # 5 minutes
-python main.py revisions --timeout 300
+python main.py --timeout 300  # 5 minutes
 ```
 
 ## Project Structure
 
 ```
 google-sync-simple/
-├── main.py          # CLI commands and OAuth flow
-├── doc_sync.py      # Core functionality (export, diff, revisions)
+├── main.py          # CLI interface and OAuth flow
+├── doc_sync.py      # Core Google Drive API functionality
 ├── .env             # Environment variables (not committed)
 ├── .env.example     # Example environment configuration
 ├── token.json       # OAuth credentials (generated, not committed)
-├── exports/         # Current content exports
-├── revisions/       # Historical revisions
-└── diffs/           # Diff outputs
+└── revisions/       # Downloaded revision history
+    └── DOCUMENT_ID/ # One folder per document
 ```
 
 ## How It Works
 
-### Export Process
-
-1. Authenticate with Google OAuth 2.0
-2. Use Drive API v3 to fetch document metadata and current content
-3. Export as plain text
-4. Save with timestamp and sanitized document title
-
-### Revision History Process
-
-1. Authenticate with Google OAuth 2.0
-2. Use Drive API **v2** to access revision history (v3 doesn't support this)
-3. For each revision:
-   - Fetch metadata (ID, timestamp, author)
-   - Download export link for plain text format
-   - Save with descriptive filename
-
-### Diff Process
-
-1. Find the two most recent files in `exports/` directory
-2. Generate unified diff with minimal context (0 lines)
-3. Save to `diffs/` directory
+1. **Authenticate**: Uses Google OAuth 2.0 (opens browser on first run)
+2. **Fetch Revisions**: Uses Drive API v2 to list all document revisions (v3 doesn't support this)
+3. **Download**: For each revision:
+   - Gets the plain text export link from the API
+   - Downloads with OAuth bearer token authentication
+   - Saves with ISO 8601 timestamp as filename
+4. **Save**: All revisions stored in `revisions/DOCUMENT_ID/`
 
 ## Troubleshooting
 
@@ -157,7 +133,7 @@ Ensure your `.env` file exists and contains both required variables:
 Increase the timeout:
 
 ```bash
-python main.py export --timeout 300
+python main.py --timeout 300
 ```
 
 ### "Insufficient permissions" or "Access denied"
@@ -169,6 +145,10 @@ python main.py export --timeout 300
 ### No revisions found
 
 The Drive API v2 only returns "grouped" revisions. Fine-grained revision history visible in the Google Docs UI may not all be accessible via the API.
+
+### "HTTP Error 429: Too Many Requests"
+
+Google API rate limits may be hit when downloading many revisions. The tool will skip failed revisions and continue with the rest. Re-run the command to retry failed downloads.
 
 ## Development
 

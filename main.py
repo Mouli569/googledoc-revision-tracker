@@ -61,7 +61,7 @@ def get_credentials(timeout: int = 120) -> Credentials:
         else:
             # Run full OAuth flow
             flow = InstalledAppFlow.from_client_secrets_file(
-                client_secret_file=client_secret_file,
+                client_secrets_file=client_secret_file,
                 scopes=SCOPES,
                 autogenerate_code_verifier=True,
             )
@@ -153,7 +153,7 @@ def revisions(
 
     print(f"Downloading revision history for '{doc_title}'...")
 
-    downloaded_files = download_revisions(service_v2, document_id, "revisions")
+    downloaded_files = download_revisions(service_v2, document_id, "revisions", credentials)
 
     print(f"Downloaded {len(downloaded_files)} revisions to revisions/{document_id}/")
     for file_path in downloaded_files:

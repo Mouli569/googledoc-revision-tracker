@@ -395,7 +395,7 @@ def create_diff(old_path: Path, new_path: Path) -> str:
     return "".join(diff)
 
 
-def download_revisions(service_v2: object, file_id: str, export_dir: str) -> List[Path]:
+def download_revisions(service_v2: object, file_id: str, export_dir: str, credentials: object = None) -> List[Path]:
     """
     Download all revisions of a Google Doc as individual text files.
 
@@ -412,6 +412,7 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str) -> Lis
         service_v2: Drive API v2 service object (required for revisions).
         file_id: Google Drive document ID.
         export_dir: Base directory for saving revisions (e.g., "revisions").
+        credentials: OAuth2 credentials for authenticated downloads (optional).
 
     Returns:
         List of Path objects for all downloaded revision files.
@@ -464,8 +465,26 @@ def download_revisions(service_v2: object, file_id: str, export_dir: str) -> Lis
         filename = f"{revision_id}_{safe_modifier}_{safe_date}.txt"
         file_path = output_dir / filename
 
-        # Download the revision content
-        urllib.request.urlretrieve(export_link, file_path)
-        downloaded_files.append(file_path)
+        # Download the revision content with OAuth authentication
+        try:
+            # Create request with authorization header
+            req = urllib.request.Request(export_link)
+            if credentials:
+                # Ensure token is fresh
+                if hasattr(credentials, 'expired') and credentials.expired:
+                    from google.auth.transport.requests import Request
+                    credentials.refresh(Request())
+                # Add authorization header
+                req.add_header('Authorization', f'Bearer {credentials.token}')
+
+            # Download the content
+            with urllib.request.urlopen(req) as response:
+                content = response.read()
+                file_path.write_bytes(content)
+                downloaded_files.append(file_path)
+        except Exception as e:
+            # Skip revisions that can't be downloaded
+            print(f"Warning: Could not download revision {revision_id}: {e}")
+            continue
 
     return downloaded_files

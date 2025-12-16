@@ -6,7 +6,8 @@ A Python CLI tool to download and track Google Docs revision history.
 
 - **Multiple Document Support**: Track revision history for multiple Google Docs simultaneously
 - **Revision History Download**: Download all historical revisions as individual timestamped files
-- **Title-Based Organization**: Revisions organized by document title for easy navigation
+- **ID-Based Organization**: Revisions organized by document ID (stable and unique identifiers)
+- **Automatic Retry with Backoff**: Handles rate limiting with exponential backoff (up to 5 retries)
 - **OAuth Authentication**: Secure authentication with automatic token refresh
 - **Flexible Input**: Specify documents via CLI arguments, config file, or environment variable
 - **Simple CLI**: Clean command interface with progress tracking
@@ -46,7 +47,16 @@ cp documents.yaml.example documents.yaml
 # Edit documents.yaml and add your document IDs
 ```
 
-Example `documents.yaml`:
+Example `documents.yaml` with custom folder names:
+```yaml
+documents:
+  - id: 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+    name: cv-matt
+  - id: 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
+    name: project-proposal
+```
+
+Or simple format (uses document ID as folder name):
 ```yaml
 documents:
   - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
@@ -112,24 +122,25 @@ python main.py --timeout 300  # 5 minutes
 
 ### Output
 
-Revisions are saved to: `revisions/{Document_Title}/{timestamp}.txt`
+Revisions are saved to: `revisions/{folder_name}/{timestamp}.txt`
 
-Example folder structure:
+Example folder structure with custom names:
 ```
 revisions/
-├── CV-Matt/
+├── cv-matt/                # Custom name from documents.yaml
 │   ├── 2025-07-30T07-18-16-081Z.txt
 │   ├── 2025-07-30T07-35-51-386Z.txt
 │   └── 2025-12-15T19-31-43-713Z.txt
-├── Project_Proposal/
+├── project-proposal/       # Custom name from documents.yaml
 │   ├── 2025-08-15T10-22-33-123Z.txt
 │   └── 2025-09-20T14-56-12-456Z.txt
-└── Meeting_Notes/
+└── 1Q-qMIRexwd.../        # Falls back to document ID if no name specified
     └── 2025-11-01T09-15-30-500Z.txt
 ```
 
-- Folders are named using sanitized document titles
-- If multiple documents have the same title, the last 6 characters of the document ID are appended
+- Folders use custom names from `documents.yaml` (if specified)
+- If no custom name provided, uses document ID (stable and unique)
+- Document titles are displayed in the CLI output for reference
 - Each filename is the exact modification timestamp from Google Drive
 
 ## Authentication
@@ -151,12 +162,13 @@ python main.py --timeout 300  # 5 minutes
 google-sync-simple/
 ├── main.py                 # CLI interface and OAuth flow
 ├── drive_revisions.py      # Core Google Drive API functionality
-├── documents.yaml          # Document IDs to track (not committed)
+├── documents.yaml          # Document IDs and custom names (not committed)
 ├── documents.yaml.example  # Example document configuration
 ├── .env                    # Environment variables (not committed)
 ├── token.json              # OAuth credentials (generated, not committed)
 └── revisions/              # Downloaded revision history
-    └── {Document_Title}/   # One folder per document (named by title)
+    ├── cv-matt/            # Custom folder name from documents.yaml
+    └── project-proposal/   # Or document ID if no name specified
 ```
 
 ## How It Works
@@ -164,14 +176,15 @@ google-sync-simple/
 1. **Resolve Document IDs**: Checks CLI arguments, config file, or environment variable
 2. **Authenticate**: Uses Google OAuth 2.0 (opens browser on first run)
 3. **For Each Document**:
-   - Fetches document title via Drive API v3
-   - Creates sanitized folder name from title
+   - Fetches document title via Drive API v3 (for display)
+   - Creates folder using document ID
    - Uses Drive API v2 to list all document revisions (v3 doesn't support this)
 4. **Download Revisions**: For each revision:
    - Gets the plain text export link from the API
    - Downloads with OAuth bearer token authentication
+   - Automatically retries with exponential backoff on rate limiting (429 errors)
    - Saves with ISO 8601 timestamp as filename
-5. **Save**: All revisions stored in `revisions/{Document_Title}/`
+5. **Save**: All revisions stored in `revisions/{DOCUMENT_ID}/`
 
 ## Troubleshooting
 

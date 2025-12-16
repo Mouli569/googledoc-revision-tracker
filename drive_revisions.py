@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -109,44 +110,69 @@ def get_required_env(var_name: str) -> str:
     )
     raise SystemExit(1)
 
-def load_document_ids_from_config(config_path: str = "documents.yaml") -> List[str]:
+def load_document_ids_from_config(config_path: str = "documents.yaml") -> Dict[str, str | None]:
     """
-    Load document IDs from YAML configuration file.
+    Load document IDs and optional names from YAML configuration file.
 
-    This function reads a YAML file containing a list of Google Doc IDs to track.
-    If the file doesn't exist or is malformed, returns an empty list.
+    This function reads a YAML file containing document IDs and optional custom names.
+    Supports two formats:
+    1. Simple: list of document ID strings
+    2. Named: list of dicts with 'id' and optional 'name' fields
 
     Args:
         config_path: Path to YAML configuration file (default: "documents.yaml").
 
     Returns:
-        List of document IDs from the config file, empty list if file doesn't exist
-        or doesn't contain a 'documents' key.
+        Dict mapping document IDs to optional folder names. If no name is specified,
+        the value is None and the document ID will be used as the folder name.
+        Returns empty dict if file doesn't exist or is malformed.
 
     Example:
-        >>> # documents.yaml content:
+        >>> # documents.yaml content (named format):
         >>> # documents:
-        >>> #   - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
-        >>> #   - 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
-        >>> ids = load_document_ids_from_config()
-        >>> print(ids)
-        ['1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8', '2A-bNkPst...']
+        >>> #   - id: 1Q-qMIRexwd...
+        >>> #     name: cv-matt
+        >>> #   - id: 2A-bNkPstu...
+        >>> #     name: project-proposal
+        >>> docs = load_document_ids_from_config()
+        >>> print(docs)
+        {'1Q-qMIRexwd...': 'cv-matt', '2A-bNkPstu...': 'project-proposal'}
+
+        >>> # documents.yaml content (simple format):
+        >>> # documents:
+        >>> #   - 1Q-qMIRexwd...
+        >>> #   - 2A-bNkPstu...
+        >>> docs = load_document_ids_from_config()
+        >>> print(docs)
+        {'1Q-qMIRexwd...': None, '2A-bNkPstu...': None}
     """
     path = Path(config_path)
     if not path.exists():
-        return []
+        return {}
 
     try:
         with path.open() as f:
             config = yaml.safe_load(f)
 
         if not config or 'documents' not in config:
-            return []
+            return {}
 
-        return config['documents']
+        result = {}
+        for item in config['documents']:
+            if isinstance(item, str):
+                # Simple format: just document ID
+                result[item] = None
+            elif isinstance(item, dict) and 'id' in item:
+                # Named format: dict with id and optional name
+                doc_id = item['id']
+                doc_name = item.get('name')
+                result[doc_id] = doc_name
+            # Ignore malformed entries
+
+        return result
     except Exception:
-        # If YAML is malformed or any other error, return empty list
-        return []
+        # If YAML is malformed or any other error, return empty dict
+        return {}
 
 def sanitize_filename(title: str, max_length: int = 200) -> str:
     """
@@ -374,6 +400,7 @@ def download_revisions(
     export_dir: str,
     credentials: object = None,
     doc_title: str | None = None,
+    folder_name: str | None = None,
 ) -> List[Path]:
     """
     Download all revisions of a Google Doc as individual text files.
@@ -382,7 +409,7 @@ def download_revisions(
     Each revision is saved as a separate file with metadata in the filename.
 
     The function:
-    1. Creates a subdirectory named after the document title (or file_id if title not provided)
+    1. Creates a subdirectory using folder_name (if provided) or document ID
     2. Fetches all available revisions via API
     3. Downloads each revision's plain text export
     4. Saves with filename: {timestamp}.txt
@@ -392,8 +419,9 @@ def download_revisions(
         file_id: Google Drive document ID.
         export_dir: Base directory for saving revisions (e.g., "revisions").
         credentials: OAuth2 credentials for authenticated downloads (optional).
-        doc_title: Document title for folder naming. If provided, uses sanitized title
-                   as folder name. If None, falls back to file_id (optional).
+        doc_title: Document title (used for display in calling code).
+        folder_name: Custom folder name for this document's revisions. If None,
+                     uses file_id as folder name (optional).
 
     Returns:
         List of Path objects for all downloaded revision files.
@@ -406,21 +434,19 @@ def download_revisions(
 
     Example:
         >>> service_v2 = build_drive_service_v2(credentials)
-        >>> files = download_revisions(service_v2, "doc_id", "revisions", doc_title="My Document")
+        >>> files = download_revisions(
+        ...     service_v2, "doc_id", "revisions",
+        ...     folder_name="cv-matt", doc_title="My CV"
+        ... )
         >>> print(f"Downloaded {len(files)} revisions")
         >>> for f in files:
         ...     print(f"  - {f.name}")
     """
     import urllib.request
 
-    # Create folder name - use title if provided, otherwise use file_id
-    if doc_title:
-        folder_name = get_unique_folder_name(export_dir, doc_title, file_id)
-    else:
-        folder_name = file_id
-
-    # Create output directory for this document's revisions
-    output_dir = Path(export_dir) / folder_name
+    # Create output directory using custom folder name or document ID
+    target_folder = folder_name if folder_name else file_id
+    output_dir = Path(export_dir) / target_folder
     output_dir.mkdir(exist_ok=True, parents=True)
 
     # Fetch all revisions from Drive API v2
@@ -448,26 +474,49 @@ def download_revisions(
         filename = f"{safe_date}.txt"
         file_path = output_dir / filename
 
-        # Download the revision content with OAuth authentication
-        try:
-            # Create request with authorization header
-            req = urllib.request.Request(export_link)
-            if credentials:
-                # Ensure token is fresh
-                if hasattr(credentials, 'expired') and credentials.expired:
-                    from google.auth.transport.requests import Request
-                    credentials.refresh(Request())
-                # Add authorization header
-                req.add_header('Authorization', f'Bearer {credentials.token}')
+        # Download the revision content with OAuth authentication and retry logic
+        max_retries = 5
+        initial_delay = 1  # seconds
 
-            # Download the content
-            with urllib.request.urlopen(req) as response:
-                content = response.read()
-                file_path.write_bytes(content)
-                downloaded_files.append(file_path)
-        except Exception as e:
-            # Skip revisions that can't be downloaded
-            print(f"Warning: Could not download revision {revision_id}: {e}")
-            continue
+        for attempt in range(max_retries):
+            try:
+                # Create request with authorization header
+                req = urllib.request.Request(export_link)
+                if credentials:
+                    # Ensure token is fresh
+                    if hasattr(credentials, 'expired') and credentials.expired:
+                        from google.auth.transport.requests import Request
+                        credentials.refresh(Request())
+                    # Add authorization header
+                    req.add_header('Authorization', f'Bearer {credentials.token}')
+
+                # Download the content
+                with urllib.request.urlopen(req) as response:
+                    content = response.read()
+                    file_path.write_bytes(content)
+                    downloaded_files.append(file_path)
+                    break  # Success - exit retry loop
+
+            except urllib.error.HTTPError as e:
+                if e.code == 429:  # Rate limit error
+                    if attempt < max_retries - 1:
+                        # Calculate exponential backoff delay
+                        delay = initial_delay * (2 ** attempt)
+                        print(f"  Rate limited on revision {revision_id}, retrying in {delay}s (attempt {attempt + 1}/{max_retries})...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        # Max retries reached
+                        print(f"  Warning: Could not download revision {revision_id} after {max_retries} attempts: {e}")
+                        break
+                else:
+                    # Non-retriable HTTP error
+                    print(f"  Warning: Could not download revision {revision_id}: HTTP {e.code} {e.reason}")
+                    break
+
+            except Exception as e:
+                # Other non-retriable errors
+                print(f"  Warning: Could not download revision {revision_id}: {e}")
+                break
 
     return downloaded_files

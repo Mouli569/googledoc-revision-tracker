@@ -551,7 +551,11 @@ def download_revisions(
     import urllib.request
 
     # Create output directory using custom folder name or document ID
-    target_folder = folder_name if folder_name else file_id
+    # Sanitize folder_name to prevent path traversal attacks
+    if folder_name:
+        target_folder = sanitize_filename(folder_name)
+    else:
+        target_folder = file_id
     output_dir = Path(export_dir) / target_folder
     output_dir.mkdir(exist_ok=True, parents=True)
 

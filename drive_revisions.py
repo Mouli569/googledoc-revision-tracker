@@ -205,6 +205,7 @@ def sanitize_filename(title: str, max_length: int = 200) -> str:
     - Removes filesystem-unsafe characters (< > : " / \\ | ? *)
     - Replaces non-alphanumeric characters with underscores
     - Collapses multiple underscores/spaces into single underscores
+    - Blocks path traversal attempts (.. sequences)
     - Handles empty strings by using 'untitled'
     - Truncates to max_length (accounting for 21 chars for timestamp and extension)
 
@@ -222,6 +223,8 @@ def sanitize_filename(title: str, max_length: int = 200) -> str:
         'untitled'
         >>> sanitize_filename("A" * 300, max_length=200)
         'AAAA...'  # Truncated to 179 chars (200 - 21 for timestamp)
+        >>> sanitize_filename("../../etc/passwd")
+        'untitled'  # Path traversal blocked
     """
     # Replace filesystem-unsafe characters with underscores
     safe_title = re.sub(r"[<>:\"/\\|?*\x00-\x1f]", "_", title)
@@ -229,6 +232,10 @@ def sanitize_filename(title: str, max_length: int = 200) -> str:
     safe_title = re.sub(r"[^\w.\-]+", "_", safe_title)
     # Collapse multiple underscores/whitespace into single underscores
     safe_title = re.sub(r"[_\s]+", "_", safe_title).strip("_")
+
+    # Block path traversal: if result contains .. or path separators, reject it
+    if '..' in safe_title or '/' in safe_title or '\\' in safe_title:
+        safe_title = "untitled"
 
     # Handle empty result
     if not safe_title:

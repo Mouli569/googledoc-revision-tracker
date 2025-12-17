@@ -396,7 +396,7 @@ def run_flow_with_timeout(flow: InstalledAppFlowProtocol, timeout: int = 120) ->
                 authorization_prompt_message="Please authorize the CLI to read the document...",
                 success_message="Authorization complete. You may close this tab.",
             )
-        except BaseException as exc:  # noqa: BLE001
+        except Exception as exc:
             result.error = exc
 
     # Run OAuth flow in separate thread to enable timeout

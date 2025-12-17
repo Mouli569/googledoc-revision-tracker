@@ -560,8 +560,33 @@ def download_revisions(
     output_dir = Path(export_dir) / target_folder
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    # Fetch all revisions from Drive API v2
-    revisions = service_v2.revisions().list(fileId=file_id).execute()
+    # Fetch all revisions from Drive API v2 with retry logic for rate limiting
+    max_retries = 5
+    initial_delay = 1  # seconds
+    revisions = None
+
+    for attempt in range(max_retries):
+        try:
+            revisions = service_v2.revisions().list(fileId=file_id).execute()
+            break  # Success - exit retry loop
+        except Exception as e:
+            # Check if it's a rate limit error (HTTP 429)
+            if hasattr(e, 'resp') and hasattr(e.resp, 'status') and e.resp.status == 429:
+                if attempt < max_retries - 1:
+                    delay = initial_delay * (2 ** attempt)
+                    print(f"  Rate limited when fetching revisions, retrying in {delay}s (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    print(f"  Error: Could not fetch revisions after {max_retries} attempts: {e}", file=sys.stderr)
+                    raise
+            else:
+                # Non-retriable error
+                raise
+
+    if not revisions:
+        print(f"  Error: Failed to fetch revisions for {file_id}", file=sys.stderr)
+        return []
 
     if 'items' not in revisions:
         return []

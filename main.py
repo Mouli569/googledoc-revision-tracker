@@ -289,7 +289,6 @@ def config_add(
     document_id: str = typer.Argument(None, help="Google Doc ID to add"),
     name: str = typer.Option(None, "--name", "-n", help="Custom folder name"),
     granularity: Granularity = typer.Option(None, "--granularity", "-g", help="Time granularity for revisions"),
-    non_interactive: bool = typer.Option(False, "--non-interactive", help="Disable interactive prompts"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """
@@ -298,15 +297,18 @@ def config_add(
     If arguments are not provided, will prompt interactively.
 
     Examples:
-        uv run google-sync config add                                # Interactive mode
-        uv run google-sync config add DOC_ID                         # With confirmation
-        uv run google-sync config add DOC_ID --yes                   # Skip confirmation
-        uv run google-sync config add DOC_ID --name cv-matt --yes    # Full non-interactive
+        uv run google-sync config add                        # Fully interactive
+        uv run google-sync config add DOC_ID                 # Prompt for optional fields
+        uv run google-sync config add DOC_ID --yes           # Skip confirmation
+        uv run google-sync config add DOC_ID -n cv -g daily  # All fields provided
     """
     config_file = Path("documents.yaml")
 
-    # Interactive mode: prompt for missing values
-    if not non_interactive:
+    # Determine if we should run in interactive mode
+    # Interactive if document_id is not provided OR if optional fields are not set
+    interactive = document_id is None or name is None or granularity is None
+
+    if interactive:
         print("📝 Add a new document to configuration\n")
 
         # Prompt for document ID if not provided

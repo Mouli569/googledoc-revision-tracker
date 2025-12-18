@@ -145,7 +145,7 @@ def auth(
 def download(
     document_ids: list[str] = typer.Argument(
         None,
-        help="Google Doc IDs or URLs to download. If not provided, reads from config file.",
+        help="Paste Google Docs URLs or provide document IDs. If not provided, reads from config file.",
     ),
     timeout: int = typer.Option(
         120, help="Seconds to wait for OAuth browser authorization"
@@ -154,14 +154,14 @@ def download(
     """
     Download revision history for one or more Google Docs.
 
-    Accepts either document IDs or full Google Docs URLs.
+    Accepts either document IDs or full Google Docs URLs (just paste from browser).
     Requires authentication first (run 'google-sync auth' if needed).
 
     Examples:
         uv run google-sync download                    # Use config file (documents.yaml)
-        uv run google-sync download DOC_ID_1           # Single document
+        uv run google-sync download DOC_ID_1           # Single document by ID
         uv run google-sync download DOC_ID_1 DOC_ID_2  # Multiple documents
-        uv run google-sync download https://docs.google.com/document/d/DOC_ID/edit  # From URL
+        uv run google-sync download https://docs.google.com/document/d/DOC_ID/edit  # Paste URL from browser
     """
     # Check for authentication
     if not credentials_exist():
@@ -291,20 +291,20 @@ def config_init(force: bool = typer.Option(False, "--force", "-f", help="Overwri
 
 @config_app.command("add")
 def config_add(
-    document_id: str = typer.Argument(None, help="Google Doc ID or URL to add"),
+    document_id: str = typer.Argument(None, help="Paste the Google Docs URL or just the document ID"),
     name: str = typer.Option(None, "--name", "-n", help="Custom folder name"),
     granularity: Granularity = typer.Option(None, "--granularity", "-g", help="Time granularity for revisions"),
 ) -> None:
     """
     Add a new document to documents.yaml configuration.
 
-    Accepts either a document ID or full Google Docs URL.
+    Accepts either a document ID or the full Google Docs URL (just paste from browser).
     Interactive mode if arguments missing, otherwise runs directly.
 
     Examples:
-        uv run google-sync config add                                    # Fully interactive
+        uv run google-sync config add                                    # Fully interactive (paste URL when prompted)
         uv run google-sync config add DOC_ID                             # Prompt for optional fields
-        uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit  # From URL
+        uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit  # Paste full URL
         uv run google-sync config add DOC_ID -n cv -g daily              # Direct add (no prompts)
     """
     config_file = Path("documents.yaml")
@@ -322,7 +322,10 @@ def config_add(
 
         # Prompt for document ID if not provided
         if not document_id:
-            doc_input = typer.prompt("Google Doc ID or URL")
+            print("You can paste the full URL from your browser:")
+            print("  Example: https://docs.google.com/document/d/DOC_ID/edit")
+            print("  Or just the document ID: DOC_ID\n")
+            doc_input = typer.prompt("Google Doc URL or ID")
             document_id = extract_doc_id_from_url(doc_input)
         else:
             print(f"Google Doc ID: {document_id}")

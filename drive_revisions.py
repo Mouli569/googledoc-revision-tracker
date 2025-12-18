@@ -15,6 +15,37 @@ from googleapiclient.discovery import build
 
 GOOGLE_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
+
+def extract_doc_id_from_url(text: str) -> str:
+    """
+    Extract Google Doc ID from URL or return the text as-is if it's already an ID.
+
+    Supports URLs like:
+    - https://docs.google.com/document/d/DOCUMENT_ID/edit
+    - https://docs.google.com/document/d/DOCUMENT_ID/edit?tab=t.0
+
+    Args:
+        text: Either a Google Docs URL or a document ID
+
+    Returns:
+        The document ID
+
+    Example:
+        >>> extract_doc_id_from_url("https://docs.google.com/document/d/1evpXdZF.../edit")
+        '1evpXdZF...'
+        >>> extract_doc_id_from_url("1evpXdZF...")
+        '1evpXdZF...'
+    """
+    # Pattern to match Google Docs URL and extract the ID
+    pattern = r'https://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)'
+    match = re.match(pattern, text)
+
+    if match:
+        return match.group(1)
+
+    # If not a URL, assume it's already a document ID
+    return text
+
 Granularity = Literal["all", "hourly", "daily", "weekly", "monthly"]
 
 @dataclass

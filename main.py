@@ -20,6 +20,7 @@ from drive_revisions import (
     build_drive_service,
     build_drive_service_v2,
     download_revisions,
+    extract_doc_id_from_url,
     fetch_document_title,
     get_required_env,
     load_document_ids_from_config,
@@ -144,7 +145,7 @@ def auth(
 def download(
     document_ids: list[str] = typer.Argument(
         None,
-        help="Google Doc IDs to download. If not provided, reads from config file.",
+        help="Google Doc IDs or URLs to download. If not provided, reads from config file.",
     ),
     timeout: int = typer.Option(
         120, help="Seconds to wait for OAuth browser authorization"
@@ -153,12 +154,14 @@ def download(
     """
     Download revision history for one or more Google Docs.
 
+    Accepts either document IDs or full Google Docs URLs.
     Requires authentication first (run 'google-sync auth' if needed).
 
     Examples:
         uv run google-sync download                    # Use config file (documents.yaml)
         uv run google-sync download DOC_ID_1           # Single document
         uv run google-sync download DOC_ID_1 DOC_ID_2  # Multiple documents
+        uv run google-sync download https://docs.google.com/document/d/DOC_ID/edit  # From URL
     """
     # Check for authentication
     if not credentials_exist():
@@ -169,8 +172,10 @@ def download(
     doc_configs: list[DocumentConfig] = []
 
     # 1. CLI arguments (highest priority) - no custom names/granularity for CLI args
+    # Extract document IDs from URLs if needed
     if document_ids:
-        doc_configs = [DocumentConfig(doc_id=doc_id) for doc_id in document_ids]
+        extracted_ids = [extract_doc_id_from_url(doc_id) for doc_id in document_ids]
+        doc_configs = [DocumentConfig(doc_id=doc_id) for doc_id in extracted_ids]
 
     # 2. Default config file: documents.yaml
     if not doc_configs:
@@ -286,21 +291,27 @@ def config_init(force: bool = typer.Option(False, "--force", "-f", help="Overwri
 
 @config_app.command("add")
 def config_add(
-    document_id: str = typer.Argument(None, help="Google Doc ID to add"),
+    document_id: str = typer.Argument(None, help="Google Doc ID or URL to add"),
     name: str = typer.Option(None, "--name", "-n", help="Custom folder name"),
     granularity: Granularity = typer.Option(None, "--granularity", "-g", help="Time granularity for revisions"),
 ) -> None:
     """
     Add a new document to documents.yaml configuration.
 
+    Accepts either a document ID or full Google Docs URL.
     Interactive mode if arguments missing, otherwise runs directly.
 
     Examples:
-        uv run google-sync config add                        # Fully interactive
-        uv run google-sync config add DOC_ID                 # Prompt for optional fields
-        uv run google-sync config add DOC_ID -n cv -g daily  # Direct add (no prompts)
+        uv run google-sync config add                                    # Fully interactive
+        uv run google-sync config add DOC_ID                             # Prompt for optional fields
+        uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit  # From URL
+        uv run google-sync config add DOC_ID -n cv -g daily              # Direct add (no prompts)
     """
     config_file = Path("documents.yaml")
+
+    # Extract document ID from URL if needed
+    if document_id:
+        document_id = extract_doc_id_from_url(document_id)
 
     # Determine if we should run in interactive mode
     # Interactive if document_id is not provided OR if optional fields are not set
@@ -311,7 +322,8 @@ def config_add(
 
         # Prompt for document ID if not provided
         if not document_id:
-            document_id = typer.prompt("Google Doc ID")
+            doc_input = typer.prompt("Google Doc ID or URL")
+            document_id = extract_doc_id_from_url(doc_input)
         else:
             print(f"Google Doc ID: {document_id}")
 

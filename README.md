@@ -99,25 +99,52 @@ uv sync
 
 ## Usage
 
-### Basic Usage
+### First-Time Setup: Authentication
+
+Before downloading documents, authenticate with Google:
+
+```bash
+uv run google-sync auth
+```
+
+This will:
+1. Open your browser for Google OAuth authorization
+2. Ask you to grant access to Google Drive
+3. Save credentials to `token.json` for future use
+
+**Re-authenticate (if needed):**
+```bash
+uv run google-sync auth --force
+```
+
+**Custom OAuth timeout:**
+```bash
+uv run google-sync auth --timeout 300  # 5 minutes instead of default 120s
+```
+
+### Downloading Documents
+
+Once authenticated, download document revisions:
 
 **Using config file (documents.yaml):**
 ```bash
-python main.py
+uv run google-sync download
 ```
 
 **Using CLI arguments (one or more documents):**
 ```bash
 # Single document
-python main.py 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
+uv run google-sync download 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
 
 # Multiple documents
-python main.py DOC_ID_1 DOC_ID_2 DOC_ID_3
+uv run google-sync download DOC_ID_1 DOC_ID_2 DOC_ID_3
 ```
 
-**With custom OAuth timeout:**
+**Show all available commands:**
 ```bash
-python main.py --timeout 300  # 5 minutes
+uv run google-sync --help
+uv run google-sync auth --help
+uv run google-sync download --help
 ```
 
 ### Output
@@ -143,17 +170,28 @@ revisions/
 - Document titles are displayed in the CLI output for reference
 - Each filename is the exact modification timestamp from Google Drive
 
-## Authentication
+## Error Messages
 
-On first run, the tool will:
-1. Open your browser for Google OAuth authorization
-2. Ask you to grant access to Google Drive
-3. Save credentials to `token.json` for future use
+The tool provides friendly error messages for common issues:
 
-The OAuth flow has a 2-minute timeout by default. If you need more time:
+**Document not found (404):**
+```
+✗ Document not found: DOC_ID
+  → Check that the document ID is correct
+  → Ensure you have access to this document
+```
 
-```bash
-python main.py --timeout 300  # 5 minutes
+**Permission denied (403):**
+```
+✗ Permission denied: DOC_ID
+  → You don't have permission to access this document
+  → Ask the owner to share it with you
+```
+
+**Authentication error (401):**
+```
+✗ Authentication error: DOC_ID
+  → Try re-authenticating with: google-sync auth --force
 ```
 
 ## Project Structure

